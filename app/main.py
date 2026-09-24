@@ -10,6 +10,7 @@ from app.core.errors import DomainError
 from app.database import close_connection, init_db
 from app.routers import affairs, announcements, departments, petitions, residents
 from app.seismic.router import router as seismic_router
+from app.seismic.alert_service import ensure_alert_schema
 from app.seismic.service import ensure_schema as ensure_seismic_schema
 
 
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
     del app
     init_db()
     ensure_seismic_schema()
+    ensure_alert_schema()
     yield
     close_connection()
 
