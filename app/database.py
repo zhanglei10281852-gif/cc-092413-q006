@@ -233,6 +233,10 @@ PERMISSIONS = [
     ("announcements.write", "维护公告", "announcements", "write"),
     ("audit.read", "查看审计", "audit", "read"),
     ("jobs.run", "执行后台任务", "jobs", "run"),
+    ("seismic.alerts.confirm", "确认预警", "seismic_alerts", "confirm"),
+    ("seismic.alerts.publish", "发布/升级预警", "seismic_alerts", "publish"),
+    ("seismic.alerts.release", "解除预警", "seismic_alerts", "release"),
+    ("seismic.alerts.void", "作废预警", "seismic_alerts", "void"),
 ]
 
 

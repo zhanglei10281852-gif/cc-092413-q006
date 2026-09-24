@@ -5,6 +5,7 @@
 ## 主要模块
 
 - 震情档案：登记地震事件、震源参数和台站观测，保留计算输入摘要。
+- 预警生命周期：带版本号的预警状态机，约束检测→待确认→已发布→升级→解除/作废的转移，检测幂等、过期版本拒绝、操作权限分级。
 - 科学计算：提供震级、距离和烈度的确定性计算，以及可恢复后台任务。
 - 灾情协同：管理灾情报告、公告、部门责任和跨部门办理状态。
 - 身份与权限：用户、角色、细粒度权限、会话令牌、账号停用和会话撤销。
@@ -54,6 +55,25 @@ curl -sS -X POST http://127.0.0.1:8432/api/auth/bootstrap   -H 'Content-Type: ap
 
 之后通过 `/api/auth/login` 获取会话令牌，并在管理接口请求头中使用 `Authorization: Bearer <token>`。
 
+## 预警生命周期
+
+预警以独立于地震事件档案的状态机管理，状态为：检测（detected）、待确认（pending_confirmation）、已发布（published）、升级（escalated）、解除（released）、作废（voided）。允许的转移：
+
+```text
+detected ──request_confirmation──▶ pending_confirmation ──confirm_publish──▶ published
+   │                                     │                                      │
+   └──────────────void───────────────────┴──────────────────────────────────────┘
+                                                                  published/escalated ──escalate──▶ escalated（级别必须提高）
+                                                                  published/escalated ──release───▶ released（终态）
+                                                                  detected/pending   ──void───────▶ voided（终态）
+```
+
+- 解除与作废是终态，不存在任何转出；迟到台站包重复检测同一事件幂等返回，不会把已结束的预警推回生效。
+- 每次成功转移使 `version` 加一；转移请求必须携带 `expected_version`，与当前版本不一致则返回 409 并记录拒绝原因。
+- 人工动作需要会话和权限：`seismic.alerts.confirm`（提交确认）、`seismic.alerts.publish`（确认发布/升级）、`seismic.alerts.release`（解除）、`seismic.alerts.void`（作废，管理员默认具备全部权限）。
+- `GET /api/seismic/alerts/{id}` 返回当前状态、版本、`last_transition`（最后一次合法转移及确认人）和 `last_rejected`（最近一次被拒绝操作的原因）。
+- 所有状态与转移（含被拒绝的操作）持久化在 `seismic_alerts` / `seismic_alert_transitions` 表，重启不丢失。
+
 ## 测试
 
 ```bash
@@ -84,7 +104,7 @@ app/
   core/            时钟、安全、异常和分页能力
   repositories/    SQLite 查询与持久化读取
   routers/         灾情、事件、公告、部门和信访业务接口
-  seismic/         地震事件、台站观测和科学计算服务
+  seismic/         地震事件、台站观测、科学计算与预警生命周期状态机
   schemas/         管理接口输入模型
   services/        身份、审计和后台任务领域服务
   cli.py           初始化、检查和冒烟入口
